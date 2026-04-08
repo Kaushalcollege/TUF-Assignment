@@ -1,5 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  X,
+  Calendar as CalendarIcon,
+  Download,
+  Pencil,
+} from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   format,
@@ -15,45 +22,51 @@ import {
 } from "date-fns";
 import "./WallCalendar.css";
 
-// Seasonal images for each month
+// --- Constants & Mock Data ---
 const MONTH_IMAGES = [
-  "https://images.unsplash.com/photo-1641755842771-165180b90ba2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=800",
-  "https://images.unsplash.com/photo-1641755842771-165180b90ba2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=800",
-  "https://images.unsplash.com/photo-1712860308569-11a26d25cef8?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=800",
-  "https://images.unsplash.com/photo-1712860308569-11a26d25cef8?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=800",
-  "https://images.unsplash.com/photo-1668487103585-0ec72fb7a941?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=800",
-  "https://images.unsplash.com/photo-1661953029179-e1b0dc900490?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=800",
-  "https://images.unsplash.com/photo-1661953029179-e1b0dc900490?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=800",
-  "https://images.unsplash.com/photo-1713009361693-9687f038b25e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=800",
-  "https://images.unsplash.com/photo-1664493115827-573d5669f032?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=800",
-  "https://images.unsplash.com/photo-1664493115827-573d5669f032?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=800",
-  "https://images.unsplash.com/photo-1664493115827-573d5669f032?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=800",
-  "https://images.unsplash.com/photo-1641755842771-165180b90ba2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=800",
+  "https://images.unsplash.com/photo-1641755842771-165180b90ba2?q=80&w=800", // Jan
+  "https://images.unsplash.com/photo-1712860308569-11a26d25cef8?q=80&w=800", // Feb
+  "https://images.unsplash.com/photo-1668487103585-0ec72fb7a941?q=80&w=800", // Mar
+  "https://images.unsplash.com/photo-1661953029179-e1b0dc900490?q=80&w=800", // Apr
+  "https://images.unsplash.com/photo-1713009361693-9687f038b25e?q=80&w=800", // May
+  "https://images.unsplash.com/photo-1664493115827-573d5669f032?q=80&w=800", // Jun
+  "https://images.unsplash.com/photo-1641755842771-165180b90ba2?q=80&w=800", // Jul
+  "https://images.unsplash.com/photo-1712860308569-11a26d25cef8?q=80&w=800", // Aug
+  "https://images.unsplash.com/photo-1668487103585-0ec72fb7a941?q=80&w=800", // Sep
+  "https://images.unsplash.com/photo-1661953029179-e1b0dc900490?q=80&w=800", // Oct
+  "https://images.unsplash.com/photo-1713009361693-9687f038b25e?q=80&w=800", // Nov
+  "https://images.unsplash.com/photo-1664493115827-573d5669f032?q=80&w=800", // Dec
 ];
 
-// Theme colors for each month
+// Seasonal Themes mapping to CSS Variables
 const MONTH_THEMES = [
-  { primary: "#4A90E2", secondary: "#E3F2FD", accent: "#1976D2" },
-  { primary: "#E91E63", secondary: "#FCE4EC", accent: "#C2185B" },
-  { primary: "#4CAF50", secondary: "#E8F5E9", accent: "#388E3C" },
-  { primary: "#FF9800", secondary: "#FFF3E0", accent: "#F57C00" },
-  { primary: "#9C27B0", secondary: "#F3E5F5", accent: "#7B1FA2" },
-  { primary: "#00BCD4", secondary: "#E0F7FA", accent: "#0097A7" },
-  { primary: "#FF5722", secondary: "#FBE9E7", accent: "#E64A19" },
-  { primary: "#3F51B5", secondary: "#E8EAF6", accent: "#303F9F" },
-  { primary: "#795548", secondary: "#EFEBE9", accent: "#5D4037" },
-  { primary: "#F44336", secondary: "#FFEBEE", accent: "#D32F2F" },
-  { primary: "#607D8B", secondary: "#ECEFF1", accent: "#455A64" },
-  { primary: "#4A90E2", secondary: "#E3F2FD", accent: "#1976D2" },
+  { primary: "#4A90E2", secondary: "#E3F2FD", accent: "#1976D2" }, // Jan
+  { primary: "#E91E63", secondary: "#FCE4EC", accent: "#C2185B" }, // Feb
+  { primary: "#4CAF50", secondary: "#E8F5E9", accent: "#388E3C" }, // Mar
+  { primary: "#FF9800", secondary: "#FFF3E0", accent: "#F57C00" }, // Apr
+  { primary: "#9C27B0", secondary: "#F3E5F5", accent: "#7B1FA2" }, // May
+  { primary: "#00BCD4", secondary: "#E0F7FA", accent: "#0097A7" }, // Jun
+  { primary: "#FF5722", secondary: "#FBE9E7", accent: "#E64A19" }, // Jul
+  { primary: "#3F51B5", secondary: "#E8EAF6", accent: "#303F9F" }, // Aug
+  { primary: "#795548", secondary: "#EFEBE9", accent: "#5D4037" }, // Sep
+  { primary: "#F44336", secondary: "#FFEBEE", accent: "#D32F2F" }, // Oct
+  { primary: "#607D8B", secondary: "#ECEFF1", accent: "#455A64" }, // Nov
+  { primary: "#4A90E2", secondary: "#E3F2FD", accent: "#1976D2" }, // Dec
 ];
 
-const INDIAN_HOLIDAYS = {
+const NOTE_CATEGORIES = {
+  general: { color: "#6b7280", label: "General" },
+  work: { color: "#ef4444", label: "Work" },
+  personal: { color: "#10b981", label: "Personal" },
+  urgent: { color: "#f59e0b", label: "Urgent" },
+};
+
+const FALLBACK_HOLIDAYS = {
   "01-01": { name: "New Year's Day", emoji: "🎉" },
   "01-26": { name: "Republic Day", emoji: "🇮🇳" },
   "08-15": { name: "Independence Day", emoji: "🇮🇳" },
   "10-02": { name: "Gandhi Jayanti", emoji: "🕊️" },
   "12-25": { name: "Christmas", emoji: "🎄" },
-  // Truncated for brevity, feel free to add the rest back
 };
 
 export function WallCalendar() {
@@ -62,132 +75,252 @@ export function WallCalendar() {
     start: null,
     end: null,
   });
-  const [notes, setNotes] = useState([]);
-  const [currentNote, setCurrentNote] = useState("");
   const [direction, setDirection] = useState(0);
   const [isFlipping, setIsFlipping] = useState(false);
 
+  // Feature States
+  const [holidays, setHolidays] = useState({});
+  const [manualTheme, setManualTheme] = useState(null); // Overrides seasonal theme
+  const [notes, setNotes] = useState([]);
+  const [currentNote, setCurrentNote] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("general");
+  const [editingNoteId, setEditingNoteId] = useState(null);
+
+  // 1. Load Notes from LocalStorage
   useEffect(() => {
-    const savedNotes = localStorage.getItem("wallcalendar-notes");
-    if (savedNotes) {
-      const parsed = JSON.parse(savedNotes);
+    const saved = localStorage.getItem("calendar-notes");
+    if (saved) {
       setNotes(
-        parsed.map((note) => ({
-          ...note,
+        JSON.parse(saved).map((n) => ({
+          ...n,
           dateRange: {
-            start: note.dateRange.start ? new Date(note.dateRange.start) : null,
-            end: note.dateRange.end ? new Date(note.dateRange.end) : null,
+            start: n.dateRange.start ? new Date(n.dateRange.start) : null,
+            end: n.dateRange.end ? new Date(n.dateRange.end) : null,
           },
         })),
       );
     }
   }, []);
 
+  // 2. Save Notes to LocalStorage
   useEffect(() => {
-    localStorage.setItem("wallcalendar-notes", JSON.stringify(notes));
+    localStorage.setItem("calendar-notes", JSON.stringify(notes));
   }, [notes]);
 
+  // 3. Real API Fetch with Graceful Fallback
+  useEffect(() => {
+    const fetchHolidays = async () => {
+      try {
+        const year = currentDate.getFullYear();
+        // Public API for holidays
+        const res = await fetch(
+          `https://date.nager.at/api/v3/PublicHolidays/${year}/IN`,
+        );
+        if (!res.ok) throw new Error("API Rate Limit or Offline");
+
+        const data = await res.json();
+        const holidayMap = {};
+        data.forEach((h) => {
+          const monthDay = h.date.substring(5); // Extracts MM-DD
+          holidayMap[monthDay] = { name: h.name, emoji: "🇮🇳" };
+        });
+        setHolidays(holidayMap);
+      } catch (error) {
+        console.warn("Using fallback holidays:", error.message);
+        setHolidays(FALLBACK_HOLIDAYS);
+      }
+    };
+    fetchHolidays();
+  }, [currentDate.getFullYear()]); // Refetch if year changes
+
+  // Date Logic Helpers
+  const currentTheme = manualTheme || MONTH_THEMES[currentDate.getMonth()];
+  const currentMonthImage = MONTH_IMAGES[currentDate.getMonth()];
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
   const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
   const firstDayOfWeek = getDay(monthStart);
 
-  const currentTheme = MONTH_THEMES[currentDate.getMonth()];
-  const currentMonthImage = MONTH_IMAGES[currentDate.getMonth()];
+  // --- Interaction Handlers ---
 
-  const handlePrevMonth = () => {
-    setDirection(-1);
-    setIsFlipping(true);
-    setTimeout(() => {
-      setCurrentDate(subMonths(currentDate, 1));
-      setTimeout(() => setIsFlipping(false), 300);
-    }, 150);
-  };
-
-  const handleNextMonth = () => {
-    setDirection(1);
-    setIsFlipping(true);
-    setTimeout(() => {
-      setCurrentDate(addMonths(currentDate, 1));
-      setTimeout(() => setIsFlipping(false), 300);
-    }, 150);
+  const jumpToToday = () => {
+    setCurrentDate(new Date());
+    setSelectedRange({ start: new Date(), end: null });
   };
 
   const handleDateClick = (date) => {
     if (!selectedRange.start || (selectedRange.start && selectedRange.end)) {
       setSelectedRange({ start: date, end: null });
     } else {
-      if (date < selectedRange.start) {
-        setSelectedRange({ start: date, end: selectedRange.start });
-      } else {
-        setSelectedRange({ start: selectedRange.start, end: date });
-      }
+      date < selectedRange.start
+        ? setSelectedRange({ start: date, end: selectedRange.start })
+        : setSelectedRange({ start: selectedRange.start, end: date });
     }
   };
 
-  const isDateInRange = (date) => {
-    if (!selectedRange.start) return false;
-    if (!selectedRange.end) return isSameDay(date, selectedRange.start);
-    return isWithinInterval(date, {
-      start: selectedRange.start,
-      end: selectedRange.end,
-    });
-  };
-
-  const isStartDate = (date) =>
-    selectedRange.start && isSameDay(date, selectedRange.start);
-  const isEndDate = (date) =>
-    selectedRange.end && isSameDay(date, selectedRange.end);
-  const getHoliday = (date) => INDIAN_HOLIDAYS[format(date, "MM-dd")];
-
-  const addNote = () => {
+  const handleSaveNote = () => {
     if (!currentNote.trim()) return;
-    const newNote = {
-      id: Date.now().toString(),
-      text: currentNote,
-      dateRange: { ...selectedRange },
-      createdAt: new Date().toISOString(),
-    };
-    setNotes([newNote, ...notes]);
+
+    if (editingNoteId) {
+      setNotes(
+        notes.map((n) =>
+          n.id === editingNoteId
+            ? { ...n, text: currentNote, category: selectedCategory }
+            : n,
+        ),
+      );
+      setEditingNoteId(null);
+    } else {
+      const newNote = {
+        id: Date.now().toString(),
+        text: currentNote,
+        category: selectedCategory,
+        dateRange: { ...selectedRange },
+      };
+      setNotes([newNote, ...notes]);
+    }
     setCurrentNote("");
+    setSelectedCategory("general");
   };
 
-  const deleteNote = (id) => setNotes(notes.filter((note) => note.id !== id));
-  const clearSelection = () => setSelectedRange({ start: null, end: null });
+  const editNote = (note) => {
+    setCurrentNote(note.text);
+    setSelectedCategory(note.category || "general");
+    setEditingNoteId(note.id);
+    setSelectedRange(note.dateRange);
+  };
 
-  const formatNoteDate = (range) => {
-    if (!range.start) return "General";
-    if (!range.end || isSameDay(range.start, range.end))
-      return format(range.start, "MMM d");
-    return `${format(range.start, "MMM d")}-${format(range.end, "d")}`;
+  const deleteNote = (id) => {
+    setNotes(notes.filter((n) => n.id !== id));
+  };
+
+  const exportNotes = () => {
+    const textContent = notes
+      .map((n) => {
+        const dateStr = formatNoteDate(n.dateRange);
+        const category = NOTE_CATEGORIES[n.category || "general"].label;
+        return `[${category}] ${dateStr}: \n${n.text}\n`;
+      })
+      .join("\n---\n\n");
+
+    const blob = new Blob([textContent || "No notes to export."], {
+      type: "text/plain",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "my-calendar-notes.txt";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Conditionals
+  const isDateInRange = (date) =>
+    selectedRange.start &&
+    (selectedRange.end
+      ? isWithinInterval(date, {
+          start: selectedRange.start,
+          end: selectedRange.end,
+        })
+      : isSameDay(date, selectedRange.start));
+  const isStart = (date) =>
+    selectedRange.start && isSameDay(date, selectedRange.start);
+  const isEnd = (date) =>
+    selectedRange.end && isSameDay(date, selectedRange.end);
+  const getHoliday = (date) => holidays[format(date, "MM-dd")];
+  const formatNoteDate = (range) =>
+    !range.start
+      ? "General"
+      : !range.end || isSameDay(range.start, range.end)
+        ? format(range.start, "MMM d")
+        : `${format(range.start, "MMM d")} - ${format(range.end, "d")}`;
+
+  // Inject CSS variables for the theme
+  const wrapperStyle = {
+    "--theme-primary": currentTheme.primary,
+    "--theme-secondary": currentTheme.secondary,
+    "--theme-accent": currentTheme.accent,
   };
 
   return (
-    <div className="calendar-page-wrapper">
+    <div className="calendar-page-wrapper" style={wrapperStyle}>
+      {/* Top Features Toolbar */}
+      <div className="top-toolbar">
+        <div className="toolbar-left">
+          <button onClick={jumpToToday} className="toolbar-btn outline">
+            <CalendarIcon size={14} /> Today
+          </button>
+          <button onClick={exportNotes} className="toolbar-btn outline">
+            <Download size={14} /> Export Notes
+          </button>
+        </div>
+
+        <div className="theme-selector">
+          <span className="theme-label">Theme:</span>
+          <button
+            onClick={() => setManualTheme(null)}
+            className={`theme-dot ${!manualTheme ? "active" : ""}`}
+            title="Auto Season"
+            style={{ background: "linear-gradient(45deg, #4A90E2, #4CAF50)" }}
+          ></button>
+          {/* A few manual theme options */}
+          <button
+            onClick={() => setManualTheme(MONTH_THEMES[0])}
+            className={`theme-dot ${manualTheme?.primary === MONTH_THEMES[0].primary ? "active" : ""}`}
+            style={{ backgroundColor: MONTH_THEMES[0].primary }}
+          ></button>
+          <button
+            onClick={() => setManualTheme(MONTH_THEMES[2])}
+            className={`theme-dot ${manualTheme?.primary === MONTH_THEMES[2].primary ? "active" : ""}`}
+            style={{ backgroundColor: MONTH_THEMES[2].primary }}
+          ></button>
+          <button
+            onClick={() => setManualTheme(MONTH_THEMES[9])}
+            className={`theme-dot ${manualTheme?.primary === MONTH_THEMES[9].primary ? "active" : ""}`}
+            style={{ backgroundColor: MONTH_THEMES[9].primary }}
+          ></button>
+        </div>
+      </div>
+
       <div className="calendar-main-container">
         {/* Navigation */}
         <div className="calendar-nav">
           <button
-            onClick={handlePrevMonth}
+            onClick={() => {
+              setDirection(-1);
+              setIsFlipping(true);
+              setTimeout(() => {
+                setCurrentDate(subMonths(currentDate, 1));
+                setTimeout(() => setIsFlipping(false), 300);
+              }, 150);
+            }}
             className="nav-btn"
             disabled={isFlipping}
           >
             <ChevronLeft size={20} />
           </button>
-
           <div className="nav-title-area">
             <div className="month-title">
               {format(currentDate, "MMMM yyyy")}
             </div>
             {selectedRange.start && (
-              <button onClick={clearSelection} className="clear-selection-btn">
+              <button
+                onClick={() => setSelectedRange({ start: null, end: null })}
+                className="clear-selection-btn"
+              >
                 <X size={12} /> Clear selection
               </button>
             )}
           </div>
-
           <button
-            onClick={handleNextMonth}
+            onClick={() => {
+              setDirection(1);
+              setIsFlipping(true);
+              setTimeout(() => {
+                setCurrentDate(addMonths(currentDate, 1));
+                setTimeout(() => setIsFlipping(false), 300);
+              }, 150);
+            }}
             className="nav-btn"
             disabled={isFlipping}
           >
@@ -201,7 +334,6 @@ export function WallCalendar() {
           animate={{ rotateY: isFlipping ? (direction > 0 ? 10 : -10) : 0 }}
           transition={{ duration: 0.3 }}
         >
-          {/* Spiral Binding */}
           <div className="spiral-binding-bar">
             <div className="spiral-rings-container">
               {Array.from({ length: 15 }).map((_, i) => (
@@ -222,54 +354,28 @@ export function WallCalendar() {
               transition={{ duration: 0.6, ease: "easeInOut" }}
               className="calendar-flip-content"
             >
-              {/* Hero Image Section */}
+              {/* Hero */}
               <div className="hero-section">
                 <img
                   src={currentMonthImage}
-                  alt={format(currentDate, "MMMM")}
+                  alt="Season"
                   className="hero-image"
                 />
-
-                {/* SVG Wave */}
                 <svg
                   className="hero-wave"
                   viewBox="0 0 500 150"
                   preserveAspectRatio="none"
                 >
-                  <defs>
-                    <linearGradient
-                      id="waveGradient"
-                      x1="0%"
-                      y1="0%"
-                      x2="100%"
-                      y2="0%"
-                    >
-                      <stop
-                        offset="0%"
-                        style={{
-                          stopColor: currentTheme.primary,
-                          stopOpacity: 0.95,
-                        }}
-                      />
-                      <stop
-                        offset="100%"
-                        style={{
-                          stopColor: currentTheme.accent,
-                          stopOpacity: 0.95,
-                        }}
-                      />
-                    </linearGradient>
-                  </defs>
                   <path
                     d="M0,80 L250,20 L500,60 L500,150 L0,150 Z"
-                    fill="url(#waveGradient)"
+                    fill="var(--theme-primary)"
+                    opacity="0.9"
                   />
                   <path
                     d="M0,100 L200,50 L500,90 L500,150 L0,150 Z"
                     fill="white"
                   />
                 </svg>
-
                 <div className="hero-text">
                   <div className="hero-year">{format(currentDate, "yyyy")}</div>
                   <div className="hero-month">
@@ -278,44 +384,52 @@ export function WallCalendar() {
                 </div>
               </div>
 
-              {/* Body Section */}
+              {/* Body */}
               <div className="calendar-body">
                 <div className="content-grid">
                   {/* Notes Area */}
                   <div className="notes-area">
-                    <div className="notes-header">Notes</div>
-                    {Array.from({ length: 7 }).map((_, i) => {
-                      const note = notes[i];
-                      return (
-                        <div key={i} className="note-slot">
-                          <div className="note-line">
-                            {note && (
-                              <div className="note-content">
-                                <div className="note-text">
-                                  <span
-                                    style={{ color: currentTheme.primary }}
-                                    className="note-date"
-                                  >
-                                    {formatNoteDate(note.dateRange)}:
-                                  </span>
-                                  <span className="note-desc">
-                                    {note.text.length > 15
-                                      ? note.text.substring(0, 15) + "..."
-                                      : note.text}
-                                  </span>
-                                </div>
-                                <button
-                                  onClick={() => deleteNote(note.id)}
-                                  className="delete-note-btn"
-                                >
-                                  <X size={12} />
-                                </button>
-                              </div>
-                            )}
-                          </div>
+                    <div className="notes-header">Memos & Notes</div>
+                    <div className="notes-list">
+                      {notes.length === 0 ? (
+                        <div className="empty-notes">
+                          No notes yet. Add one below!
                         </div>
-                      );
-                    })}
+                      ) : (
+                        notes.slice(0, 8).map((note) => (
+                          <div key={note.id} className="note-slot">
+                            <div
+                              className="note-indicator"
+                              style={{
+                                backgroundColor:
+                                  NOTE_CATEGORIES[note.category || "general"]
+                                    .color,
+                              }}
+                            ></div>
+                            <div className="note-content">
+                              <span className="note-date">
+                                {formatNoteDate(note.dateRange)}:
+                              </span>
+                              <span className="note-desc">{note.text}</span>
+                            </div>
+                            <div className="note-actions">
+                              <button
+                                onClick={() => editNote(note)}
+                                className="icon-btn edit"
+                              >
+                                <Pencil size={12} />
+                              </button>
+                              <button
+                                onClick={() => deleteNote(note.id)}
+                                className="icon-btn delete"
+                              >
+                                <X size={12} />
+                              </button>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
                   </div>
 
                   {/* Grid Area */}
@@ -325,35 +439,30 @@ export function WallCalendar() {
                         (day, i) => (
                           <div
                             key={day}
-                            className="day-header"
-                            style={{
-                              color: i >= 5 ? currentTheme.primary : "#6B7280",
-                            }}
+                            className={`day-header ${i >= 5 ? "weekend-header" : ""}`}
                           >
                             {day}
                           </div>
                         ),
                       )}
                     </div>
-
                     <div className="days-grid">
                       {Array.from({
                         length: firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1,
                       }).map((_, i) => (
                         <div key={`empty-${i}`} className="empty-cell" />
                       ))}
-
                       {daysInMonth.map((date) => {
                         const inRange = isDateInRange(date);
-                        const isStart = isStartDate(date);
-                        const isEnd = isEndDate(date);
+                        const start = isStart(date);
+                        const end = isEnd(date);
                         const holiday = getHoliday(date);
                         const today = isToday(date);
-                        const dayOfWeek = getDay(date);
-                        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+                        const isWeekend =
+                          getDay(date) === 0 || getDay(date) === 6;
 
                         let cellClass = "day-cell";
-                        if (isStart || isEnd) cellClass += " is-endpoint";
+                        if (start || end) cellClass += " is-endpoint";
                         else if (inRange) cellClass += " in-range";
                         else if (today) cellClass += " is-today";
                         else if (isWeekend) cellClass += " is-weekend";
@@ -363,24 +472,6 @@ export function WallCalendar() {
                             key={date.toISOString()}
                             onClick={() => handleDateClick(date)}
                             className={cellClass}
-                            style={{
-                              backgroundColor:
-                                isStart || isEnd
-                                  ? currentTheme.primary
-                                  : inRange
-                                    ? currentTheme.secondary
-                                    : "transparent",
-                              color:
-                                isStart || isEnd
-                                  ? "white"
-                                  : isWeekend && !inRange
-                                    ? currentTheme.primary
-                                    : "#1f2937",
-                              borderColor:
-                                today && !isStart && !isEnd
-                                  ? currentTheme.primary
-                                  : "transparent",
-                            }}
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
                           >
@@ -400,39 +491,55 @@ export function WallCalendar() {
                   </div>
                 </div>
 
-                {/* Add Note Input Area */}
+                {/* Add Note Area */}
                 <div className="add-note-section">
-                  {selectedRange.start && (
-                    <div
-                      className="selected-date-badge"
-                      style={{
-                        backgroundColor: currentTheme.secondary,
-                        color: currentTheme.accent,
-                      }}
-                    >
-                      📅 {formatNoteDate(selectedRange)}
+                  <div className="add-note-controls">
+                    {selectedRange.start && (
+                      <div className="selected-date-badge">
+                        📅 {formatNoteDate(selectedRange)}
+                      </div>
+                    )}
+                    <div className="category-selector">
+                      {Object.entries(NOTE_CATEGORIES).map(([key, cat]) => (
+                        <label
+                          key={key}
+                          className="category-label"
+                          style={{ "--cat-color": cat.color }}
+                        >
+                          <input
+                            type="radio"
+                            name="category"
+                            value={key}
+                            checked={selectedCategory === key}
+                            onChange={(e) =>
+                              setSelectedCategory(e.target.value)
+                            }
+                          />
+                          <span>{cat.label}</span>
+                        </label>
+                      ))}
                     </div>
-                  )}
+                  </div>
+
                   <div className="note-input-row">
                     <input
                       type="text"
                       value={currentNote}
                       onChange={(e) => setCurrentNote(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && addNote()}
-                      placeholder="Add a note..."
+                      onKeyDown={(e) => e.key === "Enter" && handleSaveNote()}
+                      placeholder={
+                        editingNoteId
+                          ? "Update your note..."
+                          : "Add a new note..."
+                      }
                       className="note-input"
                     />
                     <button
-                      onClick={addNote}
+                      onClick={handleSaveNote}
                       disabled={!currentNote.trim()}
                       className="add-note-btn"
-                      style={{
-                        backgroundColor: currentNote.trim()
-                          ? currentTheme.primary
-                          : "#d1d5db",
-                      }}
                     >
-                      Add
+                      {editingNoteId ? "Update" : "Add"}
                     </button>
                   </div>
                 </div>
@@ -444,30 +551,19 @@ export function WallCalendar() {
         {/* Legend */}
         <div className="legend-section">
           <div className="legend-item">
-            <div
-              className="legend-box border-only"
-              style={{ borderColor: currentTheme.primary }}
-            ></div>
+            <div className="legend-box border-only"></div>
             <span>Today</span>
           </div>
           <div className="legend-item">
-            <div
-              className="legend-box"
-              style={{ backgroundColor: currentTheme.primary }}
-            ></div>
+            <div className="legend-box primary-bg"></div>
             <span>Selected</span>
           </div>
           <div className="legend-item">
-            <div
-              className="legend-box"
-              style={{ backgroundColor: currentTheme.secondary }}
-            ></div>
+            <div className="legend-box secondary-bg"></div>
             <span>Range</span>
           </div>
           <div className="legend-item">
-            <span style={{ color: currentTheme.primary, fontWeight: 600 }}>
-              SAT/SUN
-            </span>
+            <span className="weekend-text font-semibold">SAT/SUN</span>
             <span>Weekend</span>
           </div>
         </div>
