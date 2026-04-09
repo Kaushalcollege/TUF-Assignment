@@ -24,6 +24,9 @@ import {
 } from "date-fns";
 import "./WallCalendar.css";
 
+// ⚠️ VITE ENV INJECTION: Ensure your .env file has VITE_API_NINJAS_KEY=your_key_here
+const API_NINJAS_KEY = import.meta.env.VITE_API_NINJAS_KEY || "";
+
 // --- Constants & Mock Data ---
 const MONTH_IMAGES = [
   "https://images.unsplash.com/photo-1641755842771-165180b90ba2?q=80&w=800",
@@ -63,15 +66,43 @@ const NOTE_CATEGORIES = {
 };
 
 const FALLBACK_HOLIDAYS = {
-  "01-01": { name: "New Year", emoji: "🎉" },
-  "01-26": { name: "Republic Day", emoji: "🇮🇳" },
-  "08-15": { name: "Independence Day", emoji: "🇮🇳" },
-  "10-02": { name: "Gandhi Jayanti", emoji: "🕊️" },
-  "12-25": { name: "Christmas", emoji: "🎄" },
+  "01-01": { name: "New Year" },
+  "01-26": { name: "Republic Day" },
+  "08-15": { name: "Independence Day" },
+  "10-02": { name: "Gandhi Jayanti" },
+  "12-25": { name: "Christmas" },
+};
+
+// --- Custom Physics Variants for Realistic Paper Flip ---
+const flipVariants = {
+  enter: (direction) => ({
+    // If going NEXT, new page is flat and fades in underneath.
+    // If going PREV, new page starts flipped up (-90deg) and drops down.
+    rotateX: direction > 0 ? 0 : -90,
+    opacity: direction > 0 ? 0 : 1,
+    zIndex: direction > 0 ? 0 : 10,
+    boxShadow: direction > 0 ? "none" : "0 20px 40px rgba(0,0,0,0.6)",
+  }),
+  center: {
+    rotateX: 0,
+    opacity: 1,
+    zIndex: 5,
+    boxShadow: "0 0px 0px rgba(0,0,0,0)",
+  },
+  exit: (direction) => ({
+    // If going NEXT, current page flips UP (-90deg) and away.
+    // If going PREV, current page stays flat and is covered by the falling page.
+    rotateX: direction > 0 ? -90 : 0,
+    opacity: direction > 0 ? 1 : 0,
+    zIndex: direction > 0 ? 10 : 0,
+    boxShadow: direction > 0 ? "0 20px 40px rgba(0,0,0,0.6)" : "none",
+  }),
 };
 
 export function WallCalendar() {
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const [currentDate, setCurrentDate] = useState(
+    new Date("2026-04-01T00:00:00"),
+  );
   const [selectedRange, setSelectedRange] = useState({
     start: null,
     end: null,
@@ -80,14 +111,14 @@ export function WallCalendar() {
   const [isFlipping, setIsFlipping] = useState(false);
 
   // App State
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(true);
   const [holidays, setHolidays] = useState({});
   const [notes, setNotes] = useState([]);
   const [currentNote, setCurrentNote] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("general");
   const [editingNoteId, setEditingNoteId] = useState(null);
 
-  // Load Notes & Theme Preference
+  // Storage Persistence
   useEffect(() => {
     const savedNotes = localStorage.getItem("calendar-notes");
     if (savedNotes) {
@@ -102,10 +133,9 @@ export function WallCalendar() {
       );
     }
     const savedTheme = localStorage.getItem("calendar-theme");
-    if (savedTheme === "dark") setIsDarkMode(true);
+    if (savedTheme === "light") setIsDarkMode(false);
   }, []);
 
-  // Save Notes & Theme
   useEffect(() => {
     localStorage.setItem("calendar-notes", JSON.stringify(notes));
   }, [notes]);
@@ -113,22 +143,41 @@ export function WallCalendar() {
     localStorage.setItem("calendar-theme", isDarkMode ? "dark" : "light");
   }, [isDarkMode]);
 
-  // Holiday API Fetch
+  // Robust API Fetch
   useEffect(() => {
     const fetchHolidays = async () => {
+      const year = currentDate.getFullYear();
+      console.log(`[API] Fetching holidays for India, Year: ${year}...`);
+
       try {
-        const year = currentDate.getFullYear();
+        if (!API_NINJAS_KEY) throw new Error("API Key missing from .env");
+
+        // Removed the specific `type` parameter which frequently causes 400 Bad Requests
         const res = await fetch(
-          `https://date.nager.at/api/v3/PublicHolidays/${year}/IN`,
+          `https://api.api-ninjas.com/v1/holidays?country=IN`,
+          { headers: { "X-Api-Key": API_NINJAS_KEY } },
         );
-        if (!res.ok) throw new Error("API Offline");
+
+        if (!res.ok) {
+          const errText = await res.text();
+          console.error(`[API] Fetch failed. Status: ${res.status}.`, errText);
+          throw new Error("API Offline or Bad Request");
+        }
+
         const data = await res.json();
+        console.log(`[API] Success! Fetched ${data.length} holidays.`);
+
         const holidayMap = {};
         data.forEach((h) => {
-          holidayMap[h.date.substring(5)] = { name: h.name, emoji: "🇮🇳" };
+          holidayMap[h.date.substring(5)] = { name: h.name };
         });
         setHolidays(holidayMap);
       } catch (error) {
+        console.error(
+          "[API] Caught Error:",
+          error.message,
+          "-> Using fallback data.",
+        );
         setHolidays(FALLBACK_HOLIDAYS);
       }
     };
@@ -143,12 +192,16 @@ export function WallCalendar() {
   const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
   const firstDayOfWeek = getDay(monthStart);
 
-  // Actions
-  const jumpToToday = () => {
-    setCurrentDate(new Date());
-    setSelectedRange({ start: new Date(), end: null });
-  };
+  const visibleNotes = notes.filter((n) => {
+    if (!n.dateRange.start) return false;
+    const noteDate = new Date(n.dateRange.start);
+    return (
+      noteDate.getMonth() === currentDate.getMonth() &&
+      noteDate.getFullYear() === currentDate.getFullYear()
+    );
+  });
 
+  // Actions
   const handleDateClick = (date) => {
     if (!selectedRange.start || (selectedRange.start && selectedRange.end)) {
       setSelectedRange({ start: date, end: null });
@@ -161,11 +214,20 @@ export function WallCalendar() {
 
   const handleSaveNote = () => {
     if (!currentNote.trim()) return;
+    const rangeToSave = selectedRange.start
+      ? { ...selectedRange }
+      : { start: currentDate, end: null };
+
     if (editingNoteId) {
       setNotes(
         notes.map((n) =>
           n.id === editingNoteId
-            ? { ...n, text: currentNote, category: selectedCategory }
+            ? {
+                ...n,
+                text: currentNote,
+                category: selectedCategory,
+                dateRange: rangeToSave,
+              }
             : n,
         ),
       );
@@ -176,7 +238,7 @@ export function WallCalendar() {
           id: Date.now().toString(),
           text: currentNote,
           category: selectedCategory,
-          dateRange: { ...selectedRange },
+          dateRange: rangeToSave,
         },
         ...notes,
       ]);
@@ -193,22 +255,23 @@ export function WallCalendar() {
   };
 
   const exportNotes = () => {
-    const textContent = notes
+    const textContent = visibleNotes
       .map(
         (n) =>
           `[${NOTE_CATEGORIES[n.category || "general"].label}] ${formatNoteDate(n.dateRange)}: \n${n.text}\n`,
       )
       .join("\n---\n\n");
-    const blob = new Blob([textContent || "No notes."], { type: "text/plain" });
+    const blob = new Blob([textContent || "No notes for this month."], {
+      type: "text/plain",
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "notes.txt";
+    a.download = `notes_${format(currentDate, "MMM_yyyy")}.txt`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
-  // Conditionals
   const isDateInRange = (date) =>
     selectedRange.start &&
     (selectedRange.end
@@ -223,12 +286,11 @@ export function WallCalendar() {
     selectedRange.end && isSameDay(date, selectedRange.end);
   const formatNoteDate = (range) =>
     !range.start
-      ? "Gen"
+      ? "General"
       : !range.end || isSameDay(range.start, range.end)
         ? format(range.start, "MMM d")
-        : `${format(range.start, "MMM d")}-${format(range.end, "d")}`;
+        : `${format(range.start, "MMM d")} - ${format(range.end, "d")}`;
 
-  // Dynamic CSS Variables
   const wrapperStyle = {
     "--theme-primary": currentTheme.primary,
     "--theme-secondary": isDarkMode
@@ -237,15 +299,24 @@ export function WallCalendar() {
     "--theme-accent": currentTheme.accent,
   };
 
+  const totalCells = 42;
+  const prefixEmptyDays = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1;
+  const suffixEmptyDays = totalCells - (prefixEmptyDays + daysInMonth.length);
+
   return (
     <div
       className={`calendar-page-wrapper ${isDarkMode ? "dark" : "light"}`}
       style={wrapperStyle}
     >
-      {/* Top Toolbar */}
       <div className="top-toolbar">
         <div className="toolbar-left">
-          <button onClick={jumpToToday} className="toolbar-btn outline">
+          <button
+            onClick={() => {
+              setCurrentDate(new Date());
+              setSelectedRange({ start: new Date(), end: null });
+            }}
+            className="toolbar-btn outline"
+          >
             <CalendarIcon size={14} /> Today
           </button>
           <button onClick={exportNotes} className="toolbar-btn outline">
@@ -261,7 +332,6 @@ export function WallCalendar() {
       </div>
 
       <div className="calendar-main-container">
-        {/* Navigation */}
         <div className="calendar-nav">
           <button
             onClick={() => {
@@ -270,7 +340,7 @@ export function WallCalendar() {
               setTimeout(() => {
                 setCurrentDate(subMonths(currentDate, 1));
                 setTimeout(() => setIsFlipping(false), 50);
-              }, 300);
+              }, 350);
             }}
             className="nav-btn"
             disabled={isFlipping}
@@ -289,7 +359,7 @@ export function WallCalendar() {
               setTimeout(() => {
                 setCurrentDate(addMonths(currentDate, 1));
                 setTimeout(() => setIsFlipping(false), 50);
-              }, 300);
+              }, 350);
             }}
             className="nav-btn"
             disabled={isFlipping}
@@ -298,9 +368,7 @@ export function WallCalendar() {
           </button>
         </div>
 
-        {/* 3D Calendar Card */}
         <div className="calendar-card-3d">
-          {/* Hardware Hanger */}
           <div className="calendar-hanger">
             <div className="nail"></div>
             <div className="wire"></div>
@@ -316,201 +384,222 @@ export function WallCalendar() {
             </div>
           </div>
 
-          {/* Top-Hinged Flip Animation */}
-          <AnimatePresence mode="wait" custom={direction}>
-            <motion.div
-              key={currentDate.getMonth()}
-              custom={direction}
-              initial={{ rotateX: direction > 0 ? -90 : 90, opacity: 0 }}
-              animate={{ rotateX: 0, opacity: 1 }}
-              exit={{ rotateX: direction > 0 ? 90 : -90, opacity: 0 }}
-              transition={{ type: "spring", stiffness: 100, damping: 15 }}
-              style={{ transformOrigin: "top center" }}
-              className="calendar-flip-content"
-            >
-              <div className="hero-section">
-                <img
-                  src={currentMonthImage}
-                  alt="Season"
-                  className="hero-image"
-                />
-                <svg
-                  className="hero-wave"
-                  viewBox="0 0 500 150"
-                  preserveAspectRatio="none"
-                >
-                  <path
-                    d="M0,80 L250,20 L500,60 L500,150 L0,150 Z"
-                    fill="var(--theme-primary)"
-                    opacity="0.9"
+          <div className="flip-wrapper">
+            {/* Removed mode="wait" to allow simultaneous overlap peeling animations */}
+            <AnimatePresence custom={direction}>
+              <motion.div
+                key={currentDate.getMonth()}
+                custom={direction}
+                variants={flipVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={{
+                  type: "spring",
+                  stiffness: 60,
+                  damping: 14,
+                  mass: 1,
+                }}
+                style={{
+                  transformOrigin: "top center",
+                  backfaceVisibility: "hidden",
+                }}
+                className="calendar-flip-content"
+              >
+                <div className="hero-section">
+                  <img
+                    src={currentMonthImage}
+                    alt="Season"
+                    className="hero-image"
                   />
-                  <path
-                    d="M0,100 L200,50 L500,90 L500,150 L0,150 Z"
-                    fill="var(--card-bg)"
-                  />
-                </svg>
-                <div className="hero-text">
-                  <div className="hero-year">{format(currentDate, "yyyy")}</div>
-                  <div className="hero-month">
-                    {format(currentDate, "MMMM").toUpperCase()}
-                  </div>
-                </div>
-              </div>
-
-              <div className="calendar-body">
-                <div className="content-grid">
-                  {/* Notes Area */}
-                  <div className="notes-area">
-                    <div className="notes-header">Memos & Notes</div>
-                    <div className="notes-list">
-                      {notes.length === 0 ? (
-                        <div className="empty-notes">No notes yet.</div>
-                      ) : (
-                        notes.slice(0, 4).map((note) => (
-                          <div key={note.id} className="note-slot">
-                            <div
-                              className="note-indicator"
-                              style={{
-                                backgroundColor:
-                                  NOTE_CATEGORIES[note.category || "general"]
-                                    .color,
-                              }}
-                            ></div>
-                            <div className="note-content">
-                              <span className="note-date">
-                                {formatNoteDate(note.dateRange)}:
-                              </span>
-                              <span className="note-desc">{note.text}</span>
-                            </div>
-                            <div className="note-actions">
-                              <button
-                                onClick={() => editNote(note)}
-                                className="icon-btn edit"
-                              >
-                                <Pencil size={10} />
-                              </button>
-                              <button
-                                onClick={() =>
-                                  setNotes(
-                                    notes.filter((n) => n.id !== note.id),
-                                  )
-                                }
-                                className="icon-btn delete"
-                              >
-                                <X size={10} />
-                              </button>
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Grid Area */}
-                  <div className="grid-area">
-                    <div className="day-headers">
-                      {["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"].map(
-                        (day, i) => (
-                          <div
-                            key={day}
-                            className={`day-header ${i >= 5 ? "weekend-header" : ""}`}
-                          >
-                            {day}
-                          </div>
-                        ),
-                      )}
-                    </div>
-                    <div className="days-grid">
-                      {Array.from({
-                        length: firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1,
-                      }).map((_, i) => (
-                        <div key={`empty-${i}`} className="empty-cell" />
-                      ))}
-                      {daysInMonth.map((date) => {
-                        const inRange = isDateInRange(date);
-                        const start = isStart(date);
-                        const end = isEnd(date);
-                        const holiday = holidays[format(date, "MM-dd")];
-
-                        let cellClass = "day-cell";
-                        if (start || end) cellClass += " is-endpoint";
-                        else if (inRange) cellClass += " in-range";
-                        else if (isToday(date)) cellClass += " is-today";
-                        else if (getDay(date) === 0 || getDay(date) === 6)
-                          cellClass += " is-weekend";
-
-                        return (
-                          <button
-                            key={date.toISOString()}
-                            onClick={() => handleDateClick(date)}
-                            className={cellClass}
-                          >
-                            {format(date, "d")}
-                            {holiday && (
-                              <span
-                                className="holiday-emoji"
-                                title={holiday.name}
-                              >
-                                {holiday.emoji}
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Add Note Section */}
-                <div className="add-note-section">
-                  <div className="add-note-controls">
-                    {selectedRange.start && (
-                      <div className="selected-date-badge">
-                        📅 {formatNoteDate(selectedRange)}
-                      </div>
-                    )}
-                    <div className="category-selector">
-                      {Object.entries(NOTE_CATEGORIES).map(([key, cat]) => (
-                        <label
-                          key={key}
-                          className="category-label"
-                          style={{ "--cat-color": cat.color }}
-                        >
-                          <input
-                            type="radio"
-                            name="category"
-                            value={key}
-                            checked={selectedCategory === key}
-                            onChange={(e) =>
-                              setSelectedCategory(e.target.value)
-                            }
-                          />
-                          <span>{cat.label}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="note-input-row">
-                    <input
-                      type="text"
-                      value={currentNote}
-                      onChange={(e) => setCurrentNote(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && handleSaveNote()}
-                      placeholder="Add a note..."
-                      className="note-input"
+                  <svg
+                    className="hero-wave"
+                    viewBox="0 0 500 150"
+                    preserveAspectRatio="none"
+                  >
+                    <path
+                      d="M0,80 L250,20 L500,60 L500,150 L0,150 Z"
+                      fill="var(--theme-primary)"
+                      opacity="0.9"
                     />
-                    <button
-                      onClick={handleSaveNote}
-                      disabled={!currentNote.trim()}
-                      className="add-note-btn"
-                    >
-                      Save
-                    </button>
+                    <path
+                      d="M0,100 L200,50 L500,90 L500,150 L0,150 Z"
+                      fill="var(--card-bg)"
+                    />
+                  </svg>
+                  <div className="hero-text">
+                    <div className="hero-year">
+                      {format(currentDate, "yyyy")}
+                    </div>
+                    <div className="hero-month">
+                      {format(currentDate, "MMMM").toUpperCase()}
+                    </div>
                   </div>
                 </div>
-              </div>
-            </motion.div>
-          </AnimatePresence>
+
+                <div className="calendar-body">
+                  <div className="content-grid">
+                    <div className="notes-area">
+                      <div className="notes-header">Memos</div>
+                      <div className="notes-list">
+                        {visibleNotes.length === 0 ? (
+                          <div className="empty-notes">
+                            No notes for {format(currentDate, "MMM")}.
+                          </div>
+                        ) : (
+                          visibleNotes.slice(0, 4).map((note) => (
+                            <div key={note.id} className="note-slot">
+                              <div
+                                className="note-indicator"
+                                style={{
+                                  backgroundColor:
+                                    NOTE_CATEGORIES[note.category || "general"]
+                                      .color,
+                                }}
+                              ></div>
+                              <div className="note-content">
+                                <span className="note-date">
+                                  {formatNoteDate(note.dateRange)}:
+                                </span>
+                                <span className="note-desc">{note.text}</span>
+                              </div>
+                              <div className="note-actions">
+                                <button
+                                  onClick={() => editNote(note)}
+                                  className="icon-btn edit"
+                                >
+                                  <Pencil size={10} />
+                                </button>
+                                <button
+                                  onClick={() =>
+                                    setNotes(
+                                      notes.filter((n) => n.id !== note.id),
+                                    )
+                                  }
+                                  className="icon-btn delete"
+                                >
+                                  <X size={10} />
+                                </button>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="grid-area">
+                      <div className="day-headers">
+                        {["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"].map(
+                          (day, i) => (
+                            <div
+                              key={day}
+                              className={`day-header ${i >= 5 ? "weekend-header" : ""}`}
+                            >
+                              {day}
+                            </div>
+                          ),
+                        )}
+                      </div>
+
+                      <div className="days-grid">
+                        {Array.from({ length: prefixEmptyDays }).map((_, i) => (
+                          <div
+                            key={`empty-start-${i}`}
+                            className="empty-cell"
+                          />
+                        ))}
+
+                        {daysInMonth.map((date) => {
+                          const inRange = isDateInRange(date);
+                          const start = isStart(date);
+                          const end = isEnd(date);
+                          const holiday = holidays[format(date, "MM-dd")];
+
+                          let cellClass = "day-cell";
+                          if (start || end) cellClass += " is-endpoint";
+                          else if (inRange) cellClass += " in-range";
+                          else if (isToday(date)) cellClass += " is-today";
+                          else if (getDay(date) === 0 || getDay(date) === 6)
+                            cellClass += " is-weekend";
+
+                          return (
+                            <button
+                              key={date.toISOString()}
+                              onClick={() => handleDateClick(date)}
+                              className={cellClass}
+                            >
+                              <span className="day-number">
+                                {format(date, "d")}
+                              </span>
+                              {holiday && (
+                                <span
+                                  className="holiday-text"
+                                  title={holiday.name}
+                                >
+                                  {holiday.name}
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+
+                        {Array.from({ length: suffixEmptyDays }).map((_, i) => (
+                          <div key={`empty-end-${i}`} className="empty-cell" />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="add-note-section">
+                    <div className="add-note-controls">
+                      {selectedRange.start && (
+                        <div className="selected-date-badge">
+                          📅 {formatNoteDate(selectedRange)}
+                        </div>
+                      )}
+                      <div className="category-selector">
+                        {Object.entries(NOTE_CATEGORIES).map(([key, cat]) => (
+                          <label
+                            key={key}
+                            className="category-label"
+                            style={{ "--cat-color": cat.color }}
+                          >
+                            <input
+                              type="radio"
+                              name="category"
+                              value={key}
+                              checked={selectedCategory === key}
+                              onChange={(e) =>
+                                setSelectedCategory(e.target.value)
+                              }
+                            />
+                            <span>{cat.label}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="note-input-row">
+                      <input
+                        type="text"
+                        value={currentNote}
+                        onChange={(e) => setCurrentNote(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && handleSaveNote()}
+                        placeholder="Add a note..."
+                        className="note-input"
+                      />
+                      <button
+                        onClick={handleSaveNote}
+                        disabled={!currentNote.trim()}
+                        className="add-note-btn"
+                      >
+                        Save
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            </AnimatePresence>
+          </div>
         </div>
 
         {selectedRange.start && (

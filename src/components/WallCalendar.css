@@ -4,7 +4,6 @@
   padding: 0;
 }
 
-/* Light & Dark Mode Variables */
 .calendar-page-wrapper.light {
   --bg-color: #e5e7eb;
   --card-bg: #ffffff;
@@ -27,7 +26,6 @@
   --shadow-color: rgba(0, 0, 0, 0.5);
 }
 
-/* Base Wrapper - Strict Dimensions */
 .calendar-page-wrapper {
   height: 100vh;
   width: 100vw;
@@ -52,10 +50,9 @@
   align-items: center;
 }
 
-/* Toolbar */
 .top-toolbar {
   width: 100%;
-  max-width: 450px; /* Matched to calendar width */
+  max-width: 450px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -88,7 +85,6 @@
   background: transparent;
   border: 1px solid var(--border-color);
 }
-
 .toolbar-btn.icon-only {
   padding: 0.3rem;
   border-radius: 50%;
@@ -97,7 +93,6 @@
   background: var(--hover-bg);
 }
 
-/* Navigation */
 .calendar-nav {
   display: flex;
   align-items: center;
@@ -117,7 +112,6 @@
   color: var(--text-main);
   box-shadow: 0 2px 5px var(--shadow-color);
 }
-
 .nav-btn:hover:not(:disabled) {
   transform: scale(1.1);
 }
@@ -132,7 +126,6 @@
   transition: color 0.3s ease;
 }
 
-/* 3D Card - Compact Constraint */
 .calendar-card-3d {
   position: relative;
   background: var(--card-bg);
@@ -140,16 +133,12 @@
   box-shadow: 0 20px 40px -5px var(--shadow-color);
   width: 450px;
   max-width: 95vw;
-  /* Very tight height constraints to force a single view */
   height: 70vh;
-  max-height: 600px;
+  max-height: 650px;
   display: flex;
   flex-direction: column;
-  perspective: 1200px;
-  transform-style: preserve-3d;
 }
 
-/* Hardware Hanger */
 .calendar-hanger {
   position: absolute;
   top: -25px;
@@ -160,7 +149,6 @@
   align-items: center;
   z-index: 30;
 }
-
 .nail {
   width: 6px;
   height: 6px;
@@ -181,7 +169,6 @@
   z-index: 1;
 }
 
-/* Spiral Binding */
 .spiral-binding-bar {
   flex-shrink: 0;
   height: 1.25rem;
@@ -190,7 +177,6 @@
   border-top-right-radius: 0.5rem;
   z-index: 20;
 }
-
 .spiral-rings-container {
   position: absolute;
   top: -0.3rem;
@@ -200,7 +186,6 @@
   justify-content: space-around;
   padding: 0 1.5rem;
 }
-
 .spiral-ring {
   width: 8px;
   height: 14px;
@@ -210,25 +195,31 @@
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
 }
 
-/* Page Flip Content */
-.calendar-flip-content {
+.flip-wrapper {
+  position: relative;
   flex: 1;
-  display: flex;
-  flex-direction: column;
+  perspective: 1500px;
+}
+
+.calendar-flip-content {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
   background: var(--card-bg);
   border-bottom-left-radius: 0.5rem;
   border-bottom-right-radius: 0.5rem;
-  backface-visibility: hidden;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
 }
 
-/* Hero Section */
 .hero-section {
   position: relative;
-  flex: 0 0 30%; /* Much smaller hero to save vertical space */
+  flex: 0 0 25%;
   overflow: hidden;
 }
-
 .hero-image {
   width: 100%;
   height: 100%;
@@ -239,9 +230,8 @@
   bottom: -1px;
   left: 0;
   width: 100%;
-  height: 50%;
+  height: 60%;
 }
-
 .hero-text {
   position: absolute;
   bottom: 8%;
@@ -250,7 +240,6 @@
   color: white;
   z-index: 10;
 }
-
 .hero-year {
   font-size: 1.2rem;
   font-weight: 700;
@@ -262,12 +251,12 @@
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
 }
 
-/* Calendar Body */
 .calendar-body {
   flex: 1;
   display: flex;
   flex-direction: column;
   padding: 0.75rem 1rem;
+  overflow: hidden;
 }
 
 .content-grid {
@@ -278,13 +267,12 @@
   min-height: 0;
 }
 
-/* Notes Sidebar */
 .notes-area {
   display: flex;
   flex-direction: column;
   overflow-y: auto;
+  padding-right: 4px;
 }
-
 .notes-header {
   font-size: 0.6rem;
   font-weight: 800;
@@ -326,6 +314,7 @@
 }
 .note-desc {
   color: var(--text-muted);
+  word-break: break-word;
 }
 
 .note-actions {
@@ -350,18 +339,14 @@
   color: #ef4444;
 }
 
-/* Calendar Grid */
 .grid-area {
   display: flex;
   flex-direction: column;
 }
-.day-headers,
-.days-grid {
+.day-headers {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: 2px;
-}
-.day-headers {
   margin-bottom: 0.2rem;
 }
 .day-header {
@@ -374,12 +359,18 @@
   color: var(--theme-primary);
 }
 
+/* 🌟 CRITICAL FIX: FORCES EXACTLY 6 ROWS TO PREVENT HEIGHT JUMPS */
 .days-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  grid-template-rows: repeat(6, 1fr);
+  gap: 2px;
   flex: 1;
-  align-content: stretch;
+  min-height: 0;
 }
 
-.day-cell {
+.day-cell,
+.empty-cell {
   position: relative;
   display: flex;
   align-items: center;
@@ -388,11 +379,15 @@
   font-size: 0.75rem;
   border: 1px solid transparent;
   background: transparent;
-  cursor: pointer;
   color: var(--text-main);
-  transition: background-color 0.2s;
+  padding-bottom: 6px;
+  height: 100%; /* Force grid items to fill exactly 1/6th of height */
 }
 
+.day-cell {
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
 .day-cell:not(.is-endpoint):not(.in-range):hover {
   background-color: var(--hover-bg);
 }
@@ -413,20 +408,29 @@
   box-shadow: 0 0 0 1px var(--theme-primary) inset;
 }
 
-.holiday-emoji {
+.holiday-text {
   position: absolute;
   bottom: 1px;
-  right: 1px;
-  font-size: 0.4rem;
+  left: 2px;
+  right: 2px;
+  font-size: 0.35rem;
+  color: var(--theme-primary);
+  font-weight: 800;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+}
+.day-cell.is-endpoint .holiday-text {
+  color: white;
 }
 
-/* Add Note Input Area */
 .add-note-section {
   margin-top: 0.5rem;
   padding-top: 0.5rem;
   border-top: 1px solid var(--border-color);
 }
-
 .add-note-controls {
   display: flex;
   justify-content: space-between;
@@ -500,26 +504,38 @@
   align-items: center;
   gap: 0.2rem;
   cursor: pointer;
+  z-index: 10;
 }
 .clear-selection-btn:hover {
   color: var(--text-main);
 }
 
-/* Mobile View Constraints */
+/* MOBILE RESPONSIVENESS */
 @media (max-width: 640px) {
   .calendar-card-3d {
     height: 80vh;
     width: 100%;
   }
+
   .content-grid {
-    grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    gap: 0.5rem;
   }
+
   .hero-section {
-    flex: 0 0 20%;
+    flex: 0 0 15%;
+    min-height: 70px;
   }
+
   .notes-area {
-    display: none;
+    display: flex;
+    max-height: 80px;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 0.5rem;
   }
+
   .top-toolbar {
     max-width: 100%;
   }
