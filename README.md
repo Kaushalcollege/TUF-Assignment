@@ -54,7 +54,7 @@ The application solves the problem of disjointed digital date management by comb
 
 ```text
 TUF-Assignment/
-├── public/                 # Static assets
+├── logo/                 # Static assets
 ├── src/
 │   ├── components/
 │   │   ├── WallCalendar.jsx # Main calendar logic, state, and UI
